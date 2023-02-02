@@ -137,34 +137,52 @@ class GameState:
 
         self.angle = self.get_angle_actual(self.player.angle)
 
-        self.time_on_target = 1
+        self.time_on_target = 0
 
 
         self.start_time = time.time()
         self.time_elapsed = 0
 
+
+        self.round_time = 5
+
         self.bullets = []
 
 
-    def visualize(self,angle_dict):
+    def visualize(self,angle_dict, vis_type):
         SCREEN.fill((255,255,255),(512,0,1024,512))
         self.enemy.draw()
         self.player.draw()
-        for angle, action in angle_dict.items():
-            # do nothing  ----  black
-            if action == 0:
-                color = (0,0,0)
 
-            # fire        ----  sky blue
-            elif action == 1:
-                color == (135,206,235)
-            # clockwise   ----  green
-            elif action == 2:
-                color = (100,255,0)
+        if vis_type == "Q":
+            for angle, q_value in angle_dict.items():
+                if q_value == 0:
+                    color = (255,0,0)
+                else:
+                    red_value = math.ceil(int(255*q_value))
+                    blue_value = math.ceil(int(255/q_value))
+                    color = (red_value, 0,blue_value)
 
-            # counterclockwise - red
-            elif action == 3:
-                color = (255,0,0)
+                self.player.draw_line(angle, color)
+
+                    
+
+        else:
+            for angle, action in angle_dict.items():
+                # do nothing  ----  black
+                if action == 0:
+                    color = (0,0,0)
+
+                # fire        ----  Gold
+                elif action == 1:
+                    color = (255,215,0)
+                # clockwise   ----  green
+                elif action == 2:
+                    color = (0,255,0)
+
+                # counterclockwise - red
+                elif action == 3:
+                    color = (255,0,0)      
             self.player.draw_line(angle, color)
 
     def display(self):
@@ -187,7 +205,7 @@ class GameState:
         # do nothing, shoot, turn left, turn right
         return {0:angle,1:angle,2:CW_angle,3:counter_CW_angle}
 
-    def step(self, input_action, angle_dict=None):
+    def step(self, input_action, angle_dict=None, opt=None):
         pygame.event.pump()
 
 
@@ -217,7 +235,7 @@ class GameState:
 
 
         if self.player.laser_on_target(self.enemy):
-            reward = 5
+            reward = 10
 
         
         #if self.enemy.got_hit():
@@ -244,17 +262,22 @@ class GameState:
         SCREEN.fill((255,255,255),(512,0,1024,512))
 
         if angle_dict:
-            self.visualize(angle_dict)
+            self.visualize(angle_dict, opt.visualize)
         
         pygame.display.update()
         FPSCLOCK.tick(FPS)
         self.time_elapsed = time.time() - self.start_time
 
-        if self.time_elapsed > 10:
+        if self.time_elapsed > self.round_time:
             terminal = True
             self.start_time = time.time()
         image_data = pygame.surfarray.array3d(pygame.display.get_surface())
 
+
+        if self.angle > 180:
+            reward = 1
+        elif self.angle < 180:
+            reward = -1
 
         return reward, terminal
 

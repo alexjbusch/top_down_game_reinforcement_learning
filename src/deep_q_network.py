@@ -7,9 +7,10 @@ class DeepQNetwork(nn.Module):
     def __init__(self):
         super(DeepQNetwork, self).__init__()
 
-        self.conv1 = nn.Sequential(nn.Linear(1, 64), nn.ReLU(inplace=True))
-        self.conv2 = nn.Sequential(nn.Linear(64, 64), nn.ReLU(inplace=True))
-        self.conv3 = nn.Sequential(nn.Linear(64, 1))
+
+        self.conv1 = nn.Sequential(nn.Linear(1, 8), nn.ReLU(inplace=True))
+        self.conv2 = nn.Sequential(nn.Linear(8, 8), nn.ReLU(inplace=True))
+        self.conv3 = nn.Sequential(nn.Linear(8, 1))
 
         self._create_weights()
 
@@ -25,4 +26,5 @@ class DeepQNetwork(nn.Module):
         x = self.conv2(x)
         x = self.conv3(x)
 
+        
         return x
