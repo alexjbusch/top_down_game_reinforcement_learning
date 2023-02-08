@@ -70,7 +70,7 @@ class DQN(nn.Module):
 BATCH_SIZE = 128
 GAMMA = 0.99
 EPS_START = 0.9
-EPS_END = 0.05
+EPS_END = 0.08
 EPS_DECAY = 10000
 TAU = 0.005
 LR = 1e-4
@@ -110,7 +110,7 @@ def select_action(state):
             # found, so we pick action with the larger expected reward.
             return policy_net(state).max(1)[1].view(1, 1)
     else:
-        print(eps_threshold)
+        #print(eps_threshold)
         return torch.tensor([random.sample(env.action_space, 1)], device=device, dtype=torch.long)
 
 
@@ -232,10 +232,13 @@ for i_episode in range(num_episodes):
     state, info = env.reset()
     state = torch.tensor(state, dtype=torch.float32, device=device).unsqueeze(0)
     for t in count():
+        print(state)
         action = select_action(state)
         observation, reward, terminal = env.step(action.item())
         reward = torch.tensor([reward], device=device)
         round_reward += reward
+
+
         
         if terminal:
             

@@ -8,7 +8,7 @@ import torch
 
 import time
 
-FPS = 30
+FPS = 60
 SCREENWIDTH = 512
 SCREENHEIGHT = 512
 
@@ -38,7 +38,7 @@ class Player():
 
         self.gamestate = gamestate
 
-        self.turn_speed = 2
+        self.turn_speed = 3
     def draw(self):
         pygame.draw.circle(SCREEN, self.color, (self.x,self.y), self.radius)
         target = (math.cos(math.radians(self.angle)), math.sin(math.radians(self.angle)))
@@ -64,35 +64,49 @@ class Player():
         return False
 
     def laser_on_target(self, target):
+
+        dx = math.cos(math.radians(self.angle))
+        dy = math.sin(math.radians(self.angle))
+        x0,y0 = target.x, target.y
         x1,y1 = self.x,self.y
-        x2,y2 = math.cos(math.radians(self.angle))*1000, math.sin(math.radians(self.angle))*1000
+        d = (x0-x1) * dx + (y0-y1) * dy
+        ox = dx * d + x1
+        oy = dy * d + y1
+        distance = math.sqrt((ox-x0)**2 + (oy-y0)**2)
 
-        y2 += y1
-        x2 += x1
-        
-        t1,t2 = target.x,target.y
-
-        num_points = 20
-
-        x_spacing = (x2 - x1) / (num_points + 1)
-        y_spacing = (y2 - y1) / (num_points + 1)
-
-        points = [[x1 + i * x_spacing, y1 +  i * y_spacing] 
-                for i in range(1, num_points+1)]
-
-        for point in points:
-            pygame.draw.circle(SCREEN, self.color, (point[0],point[1]), 2)
-            if abs(point[0] - x2) + abs(point[1] - y2) < target.radius:
-                target.color = target.hit_color                
-                return True
-        target.color = target.original_color
-        return False
+        if d > 0 and distance < target.radius:
+            collision = True
+        else:
+            collision = False
 
 
 
+        if collision:
+            target.color = target.hit_color
+        else:
+            target.color = target.original_color
+        return collision
+        """
+        x2,y2 = (math.cos(math.radians(self.angle))*10000, math.sin(math.radians(self.angle))*10000)
+        x2 += self.x
+        y2 += self.y
+        x1,y1 = self.x, self.y
+        r = target.radius
+        x0 = target.x
+        y0 = target.y
 
-        
+        if x2 > x1 and y2 > y1:
+            collision = False
+        else:
+            collision = abs((x2-x1)*x0 + (y1-y2)*y0 + (x1-x2)*y1 + x1*(y2-y1))/ math.sqrt((x2-x1)**2 + (y1-y2)**2) <= r
 
+        if collision:
+            target.color = target.hit_color
+        else:
+            target.color = target.original_color
+
+        return collision
+        """
         
 class Enemy():
     def __init__(self, gamestate):
@@ -105,7 +119,7 @@ class Enemy():
         
         self.color = (255,0,0)
 
-        self.dx = .2
+        self.dx = 10
         self.dy = 0
 
         self.gamestate = gamestate
@@ -123,9 +137,9 @@ class Enemy():
         self.y += self.dy
 
         if self.x + self.radius >= SCREENWIDTH:
-            self.dx = -1
+            self.dx = -10
         elif self.x - self.radius <= 0:
-            self.dx = 1
+            self.dx = 10
 
 class Bullet():
     def __init__(self, x, y, target, friendly = False):
@@ -134,9 +148,9 @@ class Bullet():
         self.x = x
         self.y = y
         self.target_vector = target
-        self.color = (235,235,0)
+        self.color = (0,0,0)
 
-        self.speed = 2
+        self.speed = 4
 
         self.alive = True
         
@@ -173,11 +187,11 @@ class GameState:
         self.time_elapsed = 0
 
 
-        self.round_time = .1
+        self.round_time = 10
 
         self.bullets = []
 
-        self.action_space = [0,1,2]
+        self.action_space = [0,1,2,3]
 
 
     def visualize(self,angle_dict, vis_type):
@@ -227,7 +241,7 @@ class GameState:
         self.bullets = []
         self.player.angle = random.randint(0,365)
         self.angle = self.get_angle_actual(self.player.angle)
-        return torch.FloatTensor([self.angle, self.player.x, self.player.y, self.enemy.x, self.enemy.y]), {}
+        return torch.FloatTensor([self.angle, self.player.x, self.player.y, self.enemy.x, self.enemy.y, self.enemy.dx]), {}
 
     def get_next_states(self):
         angle = torch.FloatTensor([self.get_angle_actual(self.player.angle)])
@@ -239,7 +253,10 @@ class GameState:
     def step(self, input_action, angle_dict=None):
         pygame.event.pump()
 
-        self.round_time += .0001
+        self.enemy.color = self.enemy.original_color
+
+        if self.round_time < 10:
+            self.round_time += 0.01
 
         reward = -1
             
@@ -257,34 +274,33 @@ class GameState:
         if input_action == 2:
             self.player.rotate_counter_CW()
             reward = -1
-
-
-
-        """
+        
         # fire        
         if input_action == 3:
             self.player.fire()
             reward = -5
-        """ 
+         
 
 
         SCREEN.fill((255,255,255),(0,0,512,512))
 
+
+        laser_on_target = False
+
         # laser on target
         if self.player.laser_on_target(self.enemy):
-            print(True)
-            reward = 20
+            laser_on_target = True
+            reward = 1
         else:
             self.time_on_target = 0
-            print(False)
 
 
         
 
-        """        
         if self.enemy.got_hit():
-            reward = 40
-        """
+            self.enemy.color = (0,255,0)
+            reward = 50
+        
 
 
         if self.player.got_hit():
@@ -312,19 +328,15 @@ class GameState:
         self.time_elapsed = time.time() - self.start_time
 
         if self.time_elapsed > self.round_time:
-            if self.player.laser_on_target(self.enemy):
-                reward = 20
-            else:
+            if not laser_on_target:
                 terminal = True
-            self.start_time = time.time()
+                self.start_time = time.time()
+                
         image_data = pygame.surfarray.array3d(pygame.display.get_surface())
 
         self.enemy.move()
 
-        state = torch.FloatTensor([self.angle, self.player.x, self.player.y, self.enemy.x, self.enemy.y])
+        state = torch.FloatTensor([self.player.angle, self.player.x, self.player.y, self.enemy.x, self.enemy.y, self.enemy.dx])
         
         return state, reward, terminal
 
-gs = GameState()
-while True:
-    gs.step(1)
